@@ -1,0 +1,681 @@
+import sys
+import pandas as pd
+import numpy as np
+import re
+import gc
+import copy
+
+reload(sys)
+sys.setdefaultencoding('utf-8')
+physical_data = DataFrame(o.get_table('eda_step1')).to_pandas()
+physical_data.set_index('cvid',inplace=True)
+
+label = DataFrame(o.get_table('meinian_round2_train')).to_pandas()
+this_topic = 'tl'
+train_index = list(label['vid'])
+print(len(train_index))
+test_index = list((DataFrame(o.get_table('meinian_round2_submit_a')).to_pandas()['vid']))
+train_index = np.array(train_index+test_index)
+physical_data = physical_data.loc[train_index,:]
+print(physical_data.shape)
+column_name = physical_data.columns
+
+
+# 2.2 通用器官特征 
+# {feature_name:keyword}
+general_feature = {
+	'vessel':['血管','动脉','静脉'],
+    'blood':['主动脉','三尖瓣','二尖瓣'],
+    'liver':['肝'],
+    'spleen':['脾'],
+	'kedney':['肾','左肾','右肾'],
+    'prostate':['前列腺'],
+    'bladder':['膀胱'],
+    'thyroid_gland':['甲状腺'],
+    'guts':['胆'],
+    'breast':['乳'],
+    'pancreas':['胰腺'],
+    'ureter':['输尿管'],
+    'heart':['心'],
+    'womb':['子宫'],
+    'bowel':['肠'],
+    'stomach':['胃'],
+    'bronchus':['支气管'],
+    'limphaden':['淋巴结']
+}	
+negative_word = ['慢性','肿大','痛疼','压痛','出现异常','不正常','差','不佳','欠均匀','坏死','异常','显示不清','扩张','增大',
+                '增厚','痛','轻度','重度','晚期','偏高','偏低','不清晰','畸形','先天性','瘘管','囊肿','湿疹','肥大','糜烂',
+                 '出血','充血','咽炎','建议医院及时就诊','建议及时就诊','过长','过短','建议进一步','手术治疗',
+                '血肿','紊乱','增生','炎','疑似','确诊','结节','疝','瘤','水肿','失常','建议复查','结石','溃疡','阻塞']     
+positive_word = ['未见明显异常','未见异常','-','正常','健康','未触及','未检出','弃查','未查','未见异','无特殊','未及','整齐',
+                '齐','单字无','无重大手术','无过敏史','无叩痛','无特殊记载','未检','活动自如','阴性','良好','及格','无扩张',
+                '未显示','未探及','未闻及','光滑']
+negative_sign = ['无','未发现','未出现','没有','不','未见']
+feature = 'csex'
+print(feature)
+new_column = []
+i = 0
+for value in physical_data.loc[:,feature]:
+    value = str(value)
+    if value == 'None':
+        sign = True
+        girl = ['c0501','c0503','c0509','c0516','c0537','c0539','c0541','c0546','c0122','c0544','c0121','c2501']
+        for item in girl:
+            if str(physical_data.ix[i,item])!='None':
+                print(physical_data.ix[i,item])
+                print(item)
+                new_column.append(1)
+                sign = False
+                break
+        if sign:
+            new_column.append(0)
+    else:
+        new_column.append(1)
+    i += 1
+physical_data.loc[:,feature] = new_column
+feature = 'cvessel'
+print(feature)
+new_column = []
+for value in physical_data.loc[:,feature]:
+    value = str(value)
+    if value == 'None':
+        new_column.append(0)
+    else:
+        if '硬化' in value or '斑块' in value or '钙化' in value:
+            new_column.append(2)
+        elif '病变' in value:
+            new_column.append(2)
+        elif '顺应性' in value or '弹性降低' in value or '弹性减弱' in value or '增宽' in value:
+            new_column.append(1)
+        else:
+            new_column.append(0)
+physical_data.loc[:,feature] = new_column
+feature = 'cblood'
+print(feature)
+new_column = []
+for value in physical_data.loc[:,feature]:
+    value = str(value)
+    if value == 'None':
+        new_column.append(0)
+    else:
+        if '反流' in value:
+            if '少量' in value or '轻度' in value:
+                new_column.append(1)
+                # continue
+            elif '中度' in value:
+                new_column.append(2)
+            elif '重度' in value:
+                new_column.append(3)
+            else:
+                new_column.append(0)
+        else:
+            new_column.append(1)
+physical_data.loc[:,feature] = new_column
+# -----------------------------肝脏
+feature = 'cliver'
+# 人工合并近义词
+merge_word = {
+'normal':['肝脏形态大小正常','肝脏大小、形态正常','肝脏:大小形态正常','肝脏:肝脏大小、形态正常','形态规则','肝脏大小正常',
+          '肝脏大小形态正常','大小形态正常','包膜光正','肝形态饱满'],
+'baomo':['包膜光滑','包膜光整','肝包膜完整','轮廓规整','被膜光整','边缘光滑'],
+'肝内管系统欠清晰':['欠清','部分肝叶显示不清'],
+'清晰':['血管走向清'],
+    '斑点状强回声':['斑点状强回声'],
+    'voice程度均匀':['回声均匀','分布均匀'],
+    'voice程度尚均匀':['回声尚均'],
+    'voice程度密集':['肝内回声密集','肝内回声细密、增强','回声增强'],
+    'voice程度稍增强':['实质回声稍增密、增强'],
+    '后方衰减':['衰减'],
+    '肝内回声呈点状密集弥漫性增强':['肝内回声弥漫密集增强'],
+    'back1':['后方有声影','后伴声影'],
+    'back0':['后方无声影'],
+   '光点细密':['光点细密','肝内光点细、密集'],
+    '不均匀':['不均匀','欠均匀']
+}
+char_to_num = {
+'清晰':{'尚清晰':0.4,'较清晰':0.5,'欠清晰':0.7,'不清晰':1},
+'无回声区':{'一个':0.5,'多个':1},
+    'voice':{'均匀':0.2,'密集':1,'尚均匀':0.5,'稍增强':0.7},
+    #'透声':{'透声好':0.5,'透声可':1},
+    #'后方':{'增强':1,'衰减':0.5},
+    'back':{'1':1,'0':0},
+    '弥漫性增强':{'稍':0.5,'弥漫性增强':1}
+}
+num_f = char_to_num.keys()
+onehot = ['baomo','后方衰减','肝脏脂肪含量超过正常值','建议您进行相关的检测和定期随诊观察','经数字化肝超检测','您的肝脏硬度值偏高',
+          '斑点状强回声','胆汁透声好','门静脉内径10','胰腺:大小、形态正常','双肾包膜完整','双肾:大小、形态正常','集合系统未见分离暗区及光团',
+          '其内回声呈网络样']
+train_x = []
+def vectorize(x):
+    temp = []
+    value = x
+    if value == None:
+        temp = [0]*n
+    else:
+        value = value.replace('.',',')
+        value = value.replace('。',',')
+        value = value.replace(';',',')
+        value = value.replace('；',',')
+        value = value.replace('_',',')
+        value = value.replace('：',':')
+        value = value.replace('，',',')
+        #print(value)
+        item_list = value.split(',')
+        word_list = []
+        for word in item_list:
+            word = word.strip('mm')
+            word = word.strip('cm')
+            for key,values in merge_word.items():
+                for sub_value in values:
+                    if sub_value in word:
+                        word = key
+                        break
+            word_list.append(word)
+        for f in onehot:
+            if f in word_list:                
+                temp.append(1)
+            else:
+                temp.append(0)
+        
+        for f in num_f:
+            stop = False
+            for c in word_list:
+                if f in c:
+                    for key in char_to_num[f].keys():
+                        if key in c:
+                            temp.append(char_to_num[f][key])
+                            stop = True
+                            break
+                    if not stop:
+                        temp.append(0.1)
+                        stop = True
+                if stop:
+                    break
+            if not stop:
+                temp.append(0)
+        temp.append(len(word_list))
+        #------------------------------加入正常异常模型
+        last = []
+        j = 1
+        if j ==1:
+            be_pos = True
+            for word in negative_word:
+                if word in value:
+                    value = value.replace(word, 'haha')
+                    be_neg = True
+                    for _ in negative_sign:
+                        if _ in value:
+                            be_neg = False
+                            break
+                    if be_neg:
+                        last.append(1)
+                        be_pos = False
+                        break
+                    else:
+                        last.append(0)
+                        be_pos = False
+                        break
+            if be_pos:        
+                pos_sign = False
+                for word in positive_word:
+                    if word in value:
+                        value = value.replace(word, 'haha')
+                        be_pos = True
+                        for _ in negative_sign:
+                            if _ in value:
+                                be_pos = False
+                                break
+                        if be_pos:
+                            last.append(0)
+                            pos_sign = True
+                            break
+                        else:
+                            last.append(1)
+                            pos_sign = True
+                            break
+                if not pos_sign:
+                    last.append(1)
+        temp.append(last[0])
+    return temp
+n = len(onehot)+len(num_f)+2
+for value in physical_data['cliver']:
+    temp = vectorize(value)
+    assert len(temp) == n
+    train_x.append(temp)
+train_x = np.array(train_x)
+print(train_x)
+name = ['liver'+str(i) for i in range(n)]
+for i in range(n):
+    physical_data[name[i]] = train_x[:,i] 
+
+print(feature)
+
+feature_viscera = ['c'+x for x in ['spleen','kdney','prostate','bladder','thyroid_gland','guts','breast','pancreas',
+    'ureter','heart','womb','bowel','stomach','bronchus','limphaden']]
+for feature in feature_viscera:
+    print(feature)
+    new_column = []
+    for value in physical_data.loc[:,feature]:
+        value = str(value)
+        if value == 'None':
+            new_column.append(0)
+        else:
+            be_pos = True
+            for word in negative_word:
+                if word in value:
+                    value = value.replace(word, 'haha')
+                    be_neg = True
+                    for n in negative_sign:
+                        if n in value:
+                            be_neg = False
+                            break
+                    if be_neg:
+                        new_column.append(1)
+                        be_pos = False
+                        break
+                    else:
+                        new_column.append(0.3)
+                        be_pos = False
+                        break
+            if be_pos:        
+                pos_sign = False
+                for word in positive_word:
+                    if word in value:
+                        value = value.replace(word, 'haha')
+                        be_pos = True
+                        for n in negative_sign:
+                            if n in value:
+                                be_pos = False
+                                break
+                        if be_pos:
+                            new_column.append(0.3)
+                            pos_sign = True
+                            break
+                        else:
+                            new_column.append(1)
+                            pos_sign = True
+                            break
+                if not pos_sign:
+                    new_column.append(1)
+    physical_data.loc[:,feature] = new_column
+physical_data['viscera_sub_num'] = len(feature_viscera) - physical_data.loc[:,feature_viscera].isnull().sum(axis=1)
+feature_viscera.append('viscera_sub_num')
+print('feature viscera finished')
+# ---------------------------------------------------------
+illness = {
+	'uric_acid':['尿酸'],
+    'blood_pressure':['血压'],
+    'blood_fat':['血脂'],
+    'hepatitis_b':['乙肝','乙型肝炎'],
+    'hepatitis_a':['甲肝','甲型肝炎'],
+	'blood_sugar':['血糖'],
+    'diabetes':['糖尿病'],
+    'overal_disease':['冠心病','胸膜炎','胆囊炎','烟','甲状腺炎']
+}
+illness_feature = ['c'+x for x in ['uric_acid','blood_pressure','blood_fat','hepatitis_b',
+                                   'hepatitis_a','blood_sugar','diabetes','overal_disease','fat']]
+feature = 'curic_acid'
+print(feature)
+new_column = []
+for value in physical_data.loc[:,feature]:
+    value = str(value)
+    if value == 'None':
+        new_column.append(0)
+    else:
+        if '高尿酸血症' in value:
+            new_column.append(1)
+        else:
+            new_column.append(0.5)
+physical_data.loc[:,feature] = new_column
+feature = 'cblood_pressure'
+print(feature)
+new_column = []
+for value in physical_data.loc[:,feature]:
+    value = str(value)
+    if value == 'None':
+        new_column.append(0)
+    else:
+        if '偏高' in value:
+            new_column.append(1)
+        else:
+            new_column.append(0.5)
+physical_data.loc[:,feature] = new_column
+feature = 'cblood_fat'
+print(feature)
+new_column = []
+for value in physical_data.loc[:,feature]:
+    value = str(value)
+    if value == 'None':
+        new_column.append(0)
+    else:
+        if '偏高' in value:
+            new_column.append(1)
+        else:
+            new_column.append(0.5)
+physical_data.loc[:,feature] = new_column
+feature = 'chepatitis_b'
+print(feature)
+new_column = []
+for value in physical_data.loc[:,feature]:
+    value = str(value)
+    if value == 'None':
+        new_column.append(0)
+    else:
+        new_column.append(1)
+physical_data.loc[:,feature] = new_column
+feature = 'chepatitis_a'
+print(feature)
+new_column = []
+for value in physical_data.loc[:,feature]:
+    value = str(value)
+    if value == 'None':
+        new_column.append(0)
+    else:
+        new_column.append(1)
+physical_data.loc[:,feature] = new_column
+feature = 'cdiabetes'
+print(feature)
+new_column = []
+for value in physical_data.loc[:,feature]:
+    value = str(value)
+    if value == 'None':
+        new_column.append(0)
+    else:
+        new_column.append(1)
+physical_data.loc[:,feature] = new_column
+feature = 'cblood_sugar'
+print(feature)
+new_column = []
+for value in physical_data.loc[:,feature]:
+    value = str(value)
+    if value == 'None':
+        new_column.append(0)
+    else:
+        new_column.append(1)
+physical_data.loc[:,feature] = new_column
+feature = 'coveral_disease'
+print(feature)
+new_column = []
+for value in physical_data.loc[:,feature]:
+    value = str(value)
+    if value == 'None':
+        new_column.append(0)
+    else:
+        new_column.append(1)
+physical_data.loc[:,feature] = new_column
+feature = 'cfat'
+print(feature)
+new_column = []
+for value in physical_data.loc[:,feature]:
+    value = str(value)
+    if value == 'None':
+        new_column.append(0)
+    elif '肝脏脂肪' in value:
+        new_column.append(1)
+    else:
+        new_column.append(0.5)
+physical_data.loc[:,feature] = new_column
+physical_data['illness_sub_num'] = len(illness_feature) - physical_data.loc[:,illness_feature].isnull().sum(axis=1)
+illness_feature.append('illness_sub_num')
+# -----------------------------------------------
+other = {
+    'heart_rate':['心率'],
+    # 心率50次/分,心动过缓，心动过速 ['c0409','c0424','c1002'] 可以均值填充'
+    'intraocular_pressure':['眼压']
+    # c1319,c1320 眼压
+}
+heart_feature = ['cheart_rate','c0409','c0424','c1002']
+print('cheart_rate')
+new_column = []
+for i in train_index:
+    rate = []
+    for f in heart_feature:
+        value = str(physical_data.loc[i,f])
+        if value == 'None':
+            continue
+        # 提取浮点数
+        num_include = re.findall(r"[-+]?\d*\.\d+|\d+", value)
+        if num_include:
+            t = np.mean([abs(float(x)) for x in num_include])
+            rate.append(t)
+    if rate:
+        new_column.append(np.mean(rate))
+    else:
+        new_column.append(None)
+physical_data.loc[:,'cheart_rate'] = new_column
+physical_data.loc[:,'cheart_rate'] = physical_data.loc[:,'cheart_rate'].fillna(
+    physical_data.loc[:,'cheart_rate'].mean())
+intraocular_feature = ['c1319','c1320']
+print('intraocular pressure')
+new_column = []
+for i in train_index:
+    rate = []
+    for f in intraocular_feature:
+        value = str(physical_data.loc[i,f])
+        if value == 'None':
+            continue
+        # 提取浮点数
+        num_include = re.findall(r"[-+]?\d*\.\d+|\d+", value)
+        if num_include:
+            t = np.mean([abs(float(x)) for x in num_include])
+            rate.append(t)
+    if rate:
+        new_column.append(np.mean(rate))
+    else:
+        new_column.append(0)
+physical_data.loc[:,'c1319'] = new_column
+# ----------------------------------------------
+# 1 过滤大量缺失数据
+# 2 列分类：1）数字列 2）等级列3）字符列4）数字等级列5）缺失值过多数字列6）看不懂列
+print(physical_data.shape)
+column_name = physical_data.columns
+drop_column = []
+valid_column = []
+numerical_columns = []
+numerical_useless_columns = []
+grade_columns = []
+char_columns = []
+num_grade_columns = []
+unknown_columns = []
+k = 0
+for f in column_name:
+    try:
+    	physical_data[f] = physical_data[f].astype('float')
+        if physical_data.loc[:,f].isnull().sum()>4000:
+            numerical_useless_columns.append(f)
+        else:
+            numerical_columns.append(f)
+    except:
+        temp = []
+        num_count = 0
+        grade_count = 0
+        other = 0
+        for value in physical_data.loc[:,f]:
+            value = str(value)
+            if value == 'None':
+                continue
+            else:
+                try:
+                    float(value)
+                    num_count += 1
+                except:
+                    if  '+' in value:
+                        grade_count+=1
+                    else:
+                        other += 1
+                        #pass
+    	# total = num_value+grade_value
+    	# num_count>100为数字列
+        # grade_count>100为等级列
+        if num_count>100 and grade_count<50:
+            #  转为数字列
+            print(f)
+            print('数字列%d,%d,%d'%(num_count,grade_count,other))
+            numerical_columns.append(f)
+            new_column = []
+            for value in physical_data.loc[:,f]:
+                value = str(value)
+                if value == 'None':
+                    new_column.append(None)
+                else:
+                    try:
+                        float(value)
+                        new_column.append(abs(float(value)))
+                    except:
+                        # q去除括号里的内容
+                        a1 = re.compile(r'\(.*?\)' )
+                        value = a1.sub('',value)
+                        # 提取浮点数
+                        num_include = re.findall(r"[-+]?\d*\.\d+|\d+", value)
+                        if num_include:
+							t = np.mean([abs(float(x)) for x in num_include])
+							new_column.append(t)   
+                        else:
+                            new_column.append(None)
+            physical_data[f] = new_column
+        elif num_count<=100 and grade_count>=50:
+                # 等级列
+            grade_columns.append(f)
+            new_column = []
+            for value in physical_data.loc[:,f]:
+                value = str(value)
+                if value == 'None':
+                    new_column.append(None)
+                elif value in ['少','少见','低','较低','少量']:
+                    new_column.append(-0.5)
+                elif '多' in value or '高'in value or '强' in value:
+                    new_column.append(1)
+                elif '+' in value or '-' in value:
+                    plus = value.count('+')
+                    minus = 0-value.count('-')*0.5
+                    new_column.append(plus+minus)
+                else:
+                    new_column.append(None)
+            physical_data[f] = new_column
+        elif num_count>100 and grade_count>=50:
+            # 转数字等级列
+            num_grade_columns.append(f)
+        else:
+            # 转字符列
+            char_columns.append(f)
+
+print('数值特征数目%d'%len(numerical_columns))
+print('数值无用特征数目%d'%len(numerical_useless_columns))
+print('等级特征数目%d'%len(grade_columns))
+print('数字等级特征数目%d'%len(num_grade_columns))
+print('字符特征数目%d'%len(char_columns))
+artificial_feature = illness_feature+feature_viscera+['cblood','cvessel','cheart_rate','c1319']
+new_column = list(set(numerical_columns+grade_columns+artificial_feature))
+drop_column = ['c0409','c0424','c1002','c1320']
+# 合并相关性高的特征，删除相关系数低的特征
+sign = 'tl'
+topic = np.log(label[sign]+1)
+topic_index = list(label['vid'])
+merge_f_name = [x for x in numerical_columns if x not in artificial_feature and x not in drop_column]
+merge_f = physical_data.loc[topic_index,merge_f_name]
+merge_f[sign]=list(topic)
+#print(merge_f[sign])
+# 去除相关性低
+name = []
+p_value = []
+num = []
+data = merge_f
+print("计算相关系数")
+for item in data.columns:
+    data[item] = data[item].astype(float)
+    valid_index = data.index[data[item].notnull()]
+    t = len(valid_index)
+    #print(data.loc[valid_index,sign])
+    #print(data.loc[valid_index,item])
+    p = np.corrcoef(data.loc[valid_index,sign],data.loc[valid_index,item])[0,1]
+    print((item,p))
+    if abs(p)<0.02:
+        continue
+    else:
+        name.append(item)
+        p_value.append(p)
+        num.append(t)
+        #continue
+    #break
+print(len(data.columns))
+print(len(name))
+#print(p_value.sort(reverse =True))
+# 合并同类数据，相关系数超过0.9，取目标相关系数最大的
+
+p_value = []
+num = []
+data = copy.deepcopy(physical_data.loc[topic_index,merge_f_name])
+for item in data.columns:
+    data[item] = data[item].fillna(0)
+del_column = []
+#print(data.corr())
+#print(np.corrcoef(topic,data.loc[:,'c004997'])[0,1])
+for key,item in data.corr().iterrows():
+    temp = {}
+    for f in merge_f_name:
+        if item[f]>0.9999:
+            temp[f]=0
+    if len(temp)>=2:
+        #print(temp)
+        for sub_item in temp.keys():
+            temp[sub_item]=np.corrcoef(data[sub_item],topic)[0,1]
+        #continue
+        #print(sorted(temp.items(),key=lambda item:item[1],reverse=True))
+        x = sorted(temp.items(),key=lambda item:item[1],reverse=True)
+        for  tu in x[1::]:
+            if tu[0] not in del_column:
+                del_column.append(tu[0])
+keep_column = [x for x in data.columns if x not in del_column]      
+print(len(keep_column))
+print('去除了%d个特征'%len(del_column))
+new_column = list(set(keep_column+grade_columns+artificial_feature))
+# 去除重复的眼压和心率特征
+valid_column = [x for x in new_column if x not in drop_column]
+new_df = pd.DataFrame()
+
+print(valid_column)
+for i in valid_column:
+    new_df[i] = physical_data.loc[:,i]
+print(new_df.shape)
+
+# physical_data = new_df
+column_name = list(physical_data.columns.values)
+numerical_feature = []
+for item in column_name:
+    try:
+        physical_data[item] = physical_data[item].astype('float')
+        numerical_feature.append(item)
+    except:
+        continue
+str_feature = [] 
+for item in column_name:
+    if item not in numerical_feature:
+        str_feature.append(item)
+print('数值特征数目%d'% (len(numerical_feature)))
+print('字符特征数目%d'%(len(str_feature)))
+# 测试，保留数值特征
+
+# 缺失值填充
+# physical_data.loc[:,numerical_feature] = physical_data.loc[:,numerical_feature].fillna(
+#    physical_data.loc[:,numerical_feature].mean())
+
+#odps.delete_table(table_name, if_exists=True)
+#DataFrame(raw_df).persist(table_name, odps=o)
+# 特征权重调整
+#('191', 9028),('193', 8341),('1850', 8245),('10004', 8013),('1117', 7937),('2405', 7737),('1814', 6909),('192', 6715)
+#('2403', 6712),('1815', 6521),('190', 6326),('1115', 6072),('2404', 5021),('10002', 4582),('2372', 4451),('0424', 4430)
+#('183', 4424),('2174', 4192),('2333', 4176),('314', 4112),('subject_num', 3740)
+#
+n = new_df.shape[0]
+for item in new_df.columns:
+    if new_df[item].isnull().sum()>0.2*n:
+        new_df[item] = new_df[item].fillna(0)
+    else:
+        new_df[item] = new_df[item].fillna(new_df[item].mean())
+	new_df[item] = new_df[item].astype('double')
+
+table_name = 'eda_step2'
+odps.delete_table(table_name, if_exists=True)
+DataFrame(new_df).persist(table_name, odps=o)
+
+

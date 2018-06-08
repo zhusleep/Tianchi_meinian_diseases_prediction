@@ -1,0 +1,264 @@
+show tables;
+
+--select distinct * from meinian_round2_data_part1 where test_id='0225';
+
+select distinct test_id from meinian_round2_data_part1prj_tc_231654_139900_vakjaj.meinian_round2_data_part1; 
+-- 创建唯一表
+create table data_part1 as 
+select distinct vid,test_id,trim(results) as results from meinian_round2_data_part1; 
+create table data_part2 as 
+select distinct vid,test_id,trim(results) as results from meinian_round2_data_part2; 
+-- 合并
+create table data_raw as 
+select * from data_part1
+union ALL 
+select * from data_part2;
+-- 处理一些字符串; 
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "阴性", '-', 0) as results from prj_tc_231654_139900_vakjaj.data_raw;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "阳性", '+', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "偏阳", '+-', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "[Pp]", '+', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "N", '-', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "IV", TO_CHAR(4) , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "V", TO_CHAR(5) , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "III", TO_CHAR(3) , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "II", TO_CHAR(2) , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "I", TO_CHAR(1) , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "。", '.' , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "[\.]{2,}", '.' , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "＜", '' , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "＞", '' , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "<", '' , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, ">", '' , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "＋", '+' , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "－", '-' , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "iv", TO_CHAR(4)  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "iii", TO_CHAR(3)  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "ii", TO_CHAR(2)  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "i", TO_CHAR(1)  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "Ⅲ", TO_CHAR(3)  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "Ⅱ", TO_CHAR(2)  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "Ⅰ", TO_CHAR(1)  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "Ⅳ", TO_CHAR(4)  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "V", TO_CHAR(5)  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "v", TO_CHAR(5)  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "Ⅴ", TO_CHAR(5)  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "未检", '', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "未查", ''  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "弃查", '', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "未检查", ''  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "^标本已退检", '', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "标本已退检$", ''  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "^/", '', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "/$", ''  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "^自述不查", '', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "自述不查$", ''  , 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "mmol/L$", '', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "度$", '', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "%$", '', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "°$", '', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "[\.]{1,}$", '', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "=", '', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+drop table if exists data_raw_002;
+create table data_raw_002 as
+select vid,test_id,regexp_replace(results, "；", ';', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_001;
+drop table if exists data_raw_001;
+create table data_raw_001 as
+select vid,test_id,regexp_replace(results, "：", ':', 0) as results from prj_tc_231654_139900_vakjaj.data_raw_002;
+
+-- 创建融合后的干净的数据表
+drop table if exists data_raw_clean;
+create table data_raw_clean as 
+select distinct vid,test_id,results from data_raw_001 where results != '' and results is not NULL and results not in ('正常',
+'未见异常','未见明显异常','无','未触及','未检出','未查','未检','弃查','无特殊','整齐','未及','齐','无过敏史','无叩痛','无特殊记载','活动自如',
+'良好','及格','无扩张','无增大','未显示','未探及','未闻及','未发现','未出现','没有','未见','详见报告单','正常心电图','透明','健康','详见纸质报告') and  results not like '%未%异常%' and 
+results not like  '%活动正常%'; 
+
+-- 调试代码
+-- 硬化/斑块/钙化/病变/弹性减低/弹性减弱/增宽
+drop table if exists data_raw_clean_add;
+create table data_raw_clean_add as
+select vid, 'vessel'  as test_id,results
+from data_raw_clean
+where results like '%血管%' or results like '%动脉%' or results like '%静脉%'
+union ALL 
+select vid, 'blood',results from data_raw_clean
+where results like '%主动脉%' or results like '%三尖瓣%' or results like '%二尖瓣%'
+union ALL 
+select vid, 'liver',results from data_raw_clean
+where results like '%肝%' 
+union ALL
+select vid, 'spleen',results from data_raw_clean
+where results like '%脾%' 
+union ALL
+select vid, 'kdney',results from data_raw_clean
+where results like '%肾%' 
+union ALL
+select vid, 'prostate',results from data_raw_clean
+where results like '%前列腺%' 
+union ALL
+select vid, 'bladder',results from data_raw_clean
+where results like '%膀胱%' 
+union ALL
+select vid, 'thyroid_gland',results from data_raw_clean
+where results like '%甲状腺%' 
+union ALL
+select vid, 'guts',results from data_raw_clean
+where results like '%胆%' 
+union ALL
+select vid, 'breast',results from data_raw_clean
+where results like '%乳%' 
+union ALL
+select vid, 'pancreas',results from data_raw_clean
+where results like '%胰腺%' 
+union ALL
+select vid, 'ureter',results from data_raw_clean
+where results like '%输尿管%' 
+union ALL
+select vid, 'heart',results from data_raw_clean
+where results like '%心%' 
+union ALL
+select vid, 'womb',results from data_raw_clean
+where results like '%子宫%' 
+union ALL
+select vid, 'bowel',results from data_raw_clean
+where results like '%肠%' 
+union ALL
+select vid, 'stomach',results from data_raw_clean
+where results like '%胃%' 
+union ALL
+select vid, 'bronchus',results from data_raw_clean
+where results like '%支气管%' 
+union ALL
+select vid, 'limphaden',results from data_raw_clean
+where results like '%淋巴结%' 
+union ALL
+select vid, 'uric_acid',results from data_raw_clean
+where results like '%尿酸%' 
+union ALL
+select vid, 'blood_pressure',results from data_raw_clean
+where results like '%血压%' 
+union ALL
+select vid, 'blood_fat',results from data_raw_clean
+where results like '%血脂%' 
+union ALL
+select vid, 'blood_sugar',results from data_raw_clean
+where results like '%血糖%' 
+union ALL
+select vid, 'hepatitis_b',results from data_raw_clean
+where results like '%乙肝%'  or results like '%乙型肝炎%'
+union ALL
+select vid, 'hepatitis_a',results from data_raw_clean
+where results like '%甲肝%'  or results like '%甲型肝炎%'
+union ALL
+select vid, 'diabetes',results from data_raw_clean
+where results like '%糖尿病%' 
+union ALL
+select vid, 'heart_rate',results from data_raw_clean
+where results like '%心率%' 
+union ALL
+select vid, 'overal_disease',results from data_raw_clean
+where results like '%胆囊炎%' or results like '%烟%' or results like '%胸膜炎%' or results like '%冠心病%' or results like '%甲状腺炎%' 
+union ALL
+select vid,'sex','1' from data_raw_clean
+where results like '%乳房%' or results like '%乳腺%' or results like '%经期%' or results like '%子宫%' or results like '%月经%' or results like '%妇科%' or results like '%阴道%' or results like '%待产%' or results like '%绝经%' or results like '%女%' or results like '%会阴%' or results like '%宫颈%' or results like '%卵巢%' or results like '%左附件%' or results like '%右附件%' or results like '%孕%'
+union ALL  
+select vid,'fat',results from data_raw_clean
+where results like '%脂肪%'
+union ALL 
+select * from data_raw_clean;
+
+--select * from data_raw where test_id = '1308'

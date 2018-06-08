@@ -1,0 +1,65 @@
+import sys
+import pandas as pd
+import numpy as np
+import re
+import gc
+reload(sys)
+sys.setdefaultencoding('utf-8')
+'''
+此脚本主要对原始数据做横竖变换，以及采集缺失数据信息。
+'''
+
+# 读取列名
+part1_name = []
+with o.execute_sql('select distinct test_id from data_part1').open_reader() as reader:
+    for record in reader:
+        part1_name.append(list(record)[0][1].decode('utf-8'))
+part2_name = []
+with o.execute_sql('select distinct test_id from data_part2').open_reader() as reader:
+    for record in reader:
+        part2_name.append(list(record)[0][1].decode('utf-8'))
+#gc.collect()
+print len(part1_name)
+print len(part2_name)
+#　统计疾病数量
+data = DataFrame(o.get_table('data_raw_clean')).to_pandas()
+data = pd.pivot_table(data,index=['vid'],columns=['test_id'],
+                               values=['results'],fill_value=None,aggfunc=lambda x: '_'.join(x))
+data.columns = data.columns.droplevel(level=0)
+print(data)
+print(data.notnull().sum(axis=1))
+print(data.shape)
+all_name = data.columns
+part1_name = [x for x in part1_name if x in all_name]
+part2_name = [x for x in part2_name if x in all_name]
+# 读取干净的数据
+physical_data = DataFrame(o.get_table('data_raw_clean_add')).to_pandas()
+physical_data = pd.pivot_table(physical_data,index=['vid'],columns=['test_id'],
+                               values=['results'],fill_value=None,aggfunc=lambda x: '_'.join(x))
+print physical_data.shape
+print(physical_data.columns)
+print(physical_data.head())
+print(physical_data.iloc[0,1])
+physical_data.columns = physical_data.columns.droplevel(level=0)
+physical_data.reset_index(inplace=True)
+# print physical_data.head()
+
+
+print part1_name
+print type(part1_name)
+
+physical_data['part1_subject_num'] = list(len(part1_name)-data.loc[:,part1_name].isnull().sum(axis=1))
+physical_data['part2_subject_num'] = list(len(part2_name)-data.loc[:,part2_name].isnull().sum(axis=1))
+physical_data['subject_num'] = list(data.notnull().sum(axis=1))
+physical_data.columns = ['c'+str(x) for x in physical_data.columns]
+print physical_data.head()
+# 保存
+table_name = 'eda_step1'
+odps.delete_table(table_name, if_exists=True)
+DataFrame(physical_data).persist(table_name, odps=o)
+
+
+        
+        
+        
+        
